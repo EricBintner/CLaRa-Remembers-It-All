@@ -190,14 +190,32 @@ curl http://localhost:8765/health
 | `CLARA_BACKEND` | `auto` | Backend: `auto`, `cuda`, `mps`, `mlx`, `cpu` |
 | `CLARA_CACHE` | `~/.cache/clara-server` | Model cache directory |
 
-## Backends
+## Backends & Memory Options
 
-| Backend | Platform | VRAM Required | Status |
-|---------|----------|---------------|--------|
-| **CUDA** | Linux/Windows + NVIDIA | ~14GB | ✅ Stable |
-| **MPS** | macOS + Apple Silicon | ~14GB unified | ✅ Stable |
-| **MLX** | macOS + Apple Silicon | ~14GB unified | 🔜 Coming |
-| **CPU** | Any | ~28GB RAM | ⚠️ Slow |
+### Compute Backends
+
+| Backend | Platform | GPU Acceleration | Status |
+|---------|----------|------------------|--------|
+| **CUDA** | Linux/Windows + NVIDIA | ✅ Yes | ✅ Stable |
+| **MPS** | macOS + Apple Silicon | ✅ Yes (Metal) | ✅ Stable |
+| **MLX** | macOS + Apple Silicon | ✅ Yes (Metal) | 🔜 Planned |
+| **MLX** | Linux | ❌ CPU only | ⚠️ Slow |
+| **CPU** | Any | ❌ No | ⚠️ Slow |
+
+> **Note on MLX + Linux:** MLX technically runs on Linux but only with CPU backend (no GPU). This is an MLX limitation, not CLaRA - MLX's GPU acceleration requires Apple's Metal API. For Linux, use CUDA with an NVIDIA GPU instead.
+
+### Memory Configurations
+
+| Mode | VRAM/RAM Required | Speed | Status |
+|------|-------------------|-------|--------|
+| **fp16** (default) | ~14GB GPU | Fast | ✅ Works |
+| **fp32** | ~28GB CPU RAM | Slow | ✅ Works |
+| **8-bit** (bitsandbytes) | ~7GB GPU | Medium | ❌ Broken* |
+| **4-bit** (bitsandbytes) | ~4GB GPU | Medium | ❌ Broken* |
+| **GPTQ** | ~4GB GPU | Fast | 🔜 Planned |
+| **AWQ** | ~4GB GPU | Fast | 🔜 Planned |
+
+*\*bitsandbytes quantization has device mismatch issues with CLaRA's custom architecture. See [QUANTIZATION.md](docs/QUANTIZATION.md) for details and workarounds.*
 
 ## Integration Examples
 
@@ -309,24 +327,37 @@ clara-server --reload
 
 ## Roadmap
 
-- [x] Core FastAPI server
-- [x] CUDA backend
+**Core:**
+- [x] FastAPI REST server
+- [x] CUDA backend (NVIDIA GPUs)
 - [x] MPS backend (Apple Silicon via PyTorch)
 - [x] Docker deployment
-- [ ] MLX backend (native Apple Silicon)
+
+**In Progress:**
+- [ ] MLX backend (native Apple Silicon, faster than MPS)
+- [ ] GPTQ quantization (4GB VRAM)
+- [ ] AWQ quantization (4GB VRAM)
+
+**Planned:**
 - [ ] Batching for higher throughput
-- [ ] Prometheus metrics
-- [ ] GPTQ/AWQ quantization support
+- [ ] Prometheus metrics endpoint
 - [ ] Multi-GPU support
 - [ ] Kubernetes Helm chart
+- [ ] bitsandbytes fix (pending upstream)
 
 ## Known Issues
 
-### bitsandbytes Quantization
+### Quantization Limitations
 
-4-bit and 8-bit quantization via bitsandbytes currently causes device mismatch errors with CLaRA's custom model architecture. We're tracking this issue and will add support when resolved. See [QUANTIZATION.md](docs/QUANTIZATION.md) for details.
+4-bit and 8-bit quantization via bitsandbytes currently causes device mismatch errors with CLaRA's custom model architecture. This is due to how bitsandbytes handles CPU↔GPU tensor placement combined with CLaRA's `index_select` operations.
 
-**Current workaround:** Use fp16 with sufficient VRAM, or offload to a machine with more memory.
+**Workarounds:**
+- Use fp16 with sufficient VRAM (14GB+)
+- Use Apple Silicon with MPS backend (unified memory avoids the issue)
+- Run as a network service on a machine with sufficient resources
+- Wait for GPTQ/AWQ support (keeps all weights on GPU)
+
+See [QUANTIZATION.md](docs/QUANTIZATION.md) for technical details.
 
 ## Contributing
 
