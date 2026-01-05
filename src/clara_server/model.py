@@ -1,0 +1,342 @@
+"""
+CLaRA model loading and inference.
+
+Supports multiple backends:
+- CUDA: NVIDIA GPUs via PyTorch
+- MPS: Apple Silicon via PyTorch
+- MLX: Apple Silicon native (coming soon)
+- CPU: Fallback for any platform
+"""
+
+import logging
+import time
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from clara_server.config import Backend, Settings, get_settings
+
+logger = logging.getLogger(__name__)
+
+
+class BaseModelBackend(ABC):
+    """Abstract base class for model backends."""
+    
+    @abstractmethod
+    def load(self, model_path: str, settings: Settings) -> None:
+        """Load the model."""
+        pass
+    
+    @abstractmethod
+    def generate(
+        self,
+        memories: List[str],
+        query: str,
+        max_new_tokens: int = 128,
+    ) -> str:
+        """Generate answer from compressed memories."""
+        pass
+    
+    @abstractmethod
+    def is_loaded(self) -> bool:
+        """Check if model is loaded."""
+        pass
+    
+    @abstractmethod
+    def unload(self) -> None:
+        """Unload model and free resources."""
+        pass
+    
+    @abstractmethod
+    def get_info(self) -> Dict[str, Any]:
+        """Get backend info for status endpoint."""
+        pass
+
+
+class PyTorchBackend(BaseModelBackend):
+    """PyTorch backend supporting CUDA and MPS."""
+    
+    def __init__(self, device: str = "auto"):
+        self._model = None
+        self._device = device
+        self._actual_device = None
+        self._dtype = None
+        self._load_time = None
+    
+    def load(self, model_path: str, settings: Settings) -> None:
+        """Load CLaRA model using PyTorch/Transformers."""
+        import torch
+        from huggingface_hub import snapshot_download
+        from transformers import AutoModel
+        
+        start = time.time()
+        
+        # Determine device
+        if self._device == "auto":
+            self._device = settings.detect_backend()
+        
+        if self._device == Backend.CUDA.value:
+            self._actual_device = f"cuda:{settings.device_id}"
+            self._dtype = torch.float16
+        elif self._device == Backend.MPS.value:
+            self._actual_device = "mps"
+            self._dtype = torch.float16
+        else:
+            self._actual_device = "cpu"
+            self._dtype = torch.float32
+        
+        logger.info(f"Using device: {self._actual_device}, dtype: {self._dtype}")
+        
+        # Download model if needed
+        cache_dir = settings.cache_dir / "hf_download"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"Downloading/loading {settings.model}...")
+        local_dir = snapshot_download(
+            repo_id=settings.model,
+            local_dir=str(cache_dir),
+        )
+        
+        # Load from subfolder (CLaRA requires this structure)
+        full_model_path = f"{local_dir}/{settings.subfolder}"
+        logger.info(f"Loading model from {full_model_path}")
+        
+        self._model = AutoModel.from_pretrained(
+            full_model_path,
+            trust_remote_code=True,
+            torch_dtype=self._dtype,
+            device_map="auto" if self._actual_device.startswith("cuda") else None,
+        )
+        
+        # Move to device if not using device_map
+        if not self._actual_device.startswith("cuda"):
+            self._model = self._model.to(self._actual_device)
+        
+        self._load_time = time.time() - start
+        logger.info(f"Model loaded in {self._load_time:.1f}s")
+    
+    def generate(
+        self,
+        memories: List[str],
+        query: str,
+        max_new_tokens: int = 128,
+    ) -> str:
+        """Generate answer using CLaRA's generate_from_text method."""
+        import torch
+        
+        if self._model is None:
+            raise RuntimeError("Model not loaded")
+        
+        with torch.no_grad():
+            output = self._model.generate_from_text(
+                questions=[query],
+                documents=[memories],
+                max_new_tokens=max_new_tokens,
+            )
+        
+        return output[0] if output else ""
+    
+    def is_loaded(self) -> bool:
+        return self._model is not None
+    
+    def unload(self) -> None:
+        """Unload model and free GPU memory."""
+        if self._model is not None:
+            del self._model
+            self._model = None
+            
+            # Clear CUDA cache
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:
+                pass
+            
+            logger.info("Model unloaded")
+    
+    def get_info(self) -> Dict[str, Any]:
+        return {
+            "backend": "pytorch",
+            "device": self._actual_device,
+            "dtype": str(self._dtype),
+            "load_time_seconds": self._load_time,
+        }
+
+
+class MLXBackend(BaseModelBackend):
+    """
+    MLX backend for native Apple Silicon support.
+    
+    Status: Placeholder for future implementation.
+    MLX provides better memory efficiency and performance on Apple Silicon.
+    """
+    
+    def __init__(self):
+        self._model = None
+        self._load_time = None
+    
+    def load(self, model_path: str, settings: Settings) -> None:
+        """Load CLaRA model using MLX."""
+        # TODO: Implement MLX loading when CLaRA MLX weights are available
+        # This will require either:
+        # 1. Converting PyTorch weights to MLX format
+        # 2. Apple releasing MLX-native weights
+        raise NotImplementedError(
+            "MLX backend is not yet implemented. "
+            "CLaRA requires custom model code that needs MLX porting. "
+            "Use 'mps' backend for Apple Silicon via PyTorch."
+        )
+    
+    def generate(
+        self,
+        memories: List[str],
+        query: str,
+        max_new_tokens: int = 128,
+    ) -> str:
+        raise NotImplementedError("MLX backend not implemented")
+    
+    def is_loaded(self) -> bool:
+        return self._model is not None
+    
+    def unload(self) -> None:
+        if self._model is not None:
+            del self._model
+            self._model = None
+    
+    def get_info(self) -> Dict[str, Any]:
+        return {
+            "backend": "mlx",
+            "status": "not_implemented",
+            "load_time_seconds": self._load_time,
+        }
+
+
+class ClaraModel:
+    """
+    High-level CLaRA model wrapper.
+    
+    Automatically selects the best backend and provides a unified interface.
+    """
+    
+    def __init__(self, settings: Optional[Settings] = None):
+        self.settings = settings or get_settings()
+        self._backend: Optional[BaseModelBackend] = None
+        self._stats = {
+            "requests": 0,
+            "total_latency": 0.0,
+            "errors": 0,
+        }
+    
+    def load(self) -> None:
+        """Load the model using the configured backend."""
+        backend_name = self.settings.detect_backend()
+        logger.info(f"Initializing {backend_name} backend")
+        
+        if backend_name == Backend.MLX.value:
+            self._backend = MLXBackend()
+        else:
+            self._backend = PyTorchBackend(device=backend_name)
+        
+        self._backend.load(self.settings.model, self.settings)
+    
+    def compress(
+        self,
+        memories: List[str],
+        query: str,
+        max_new_tokens: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Compress memories and generate answer.
+        
+        Args:
+            memories: List of memory strings to compress
+            query: Question to answer from compressed context
+            max_new_tokens: Maximum tokens in response
+        
+        Returns:
+            Dict with success, answer, token counts, compression ratio, latency
+        """
+        if self._backend is None or not self._backend.is_loaded():
+            return {
+                "success": False,
+                "error": "Model not loaded",
+                "answer": None,
+            }
+        
+        max_tokens = max_new_tokens or self.settings.max_new_tokens
+        start = time.time()
+        
+        try:
+            answer = self._backend.generate(memories, query, max_tokens)
+            
+            # Estimate token counts (rough approximation)
+            original_tokens = sum(len(m.split()) * 1.3 for m in memories)
+            compressed_tokens = original_tokens / 16  # CLaRA achieves ~16x compression
+            
+            latency = (time.time() - start) * 1000
+            self._stats["requests"] += 1
+            self._stats["total_latency"] += latency
+            
+            return {
+                "success": True,
+                "answer": answer,
+                "original_tokens": int(original_tokens),
+                "compressed_tokens": int(compressed_tokens),
+                "compression_ratio": round(original_tokens / max(1, compressed_tokens), 1),
+                "latency_ms": round(latency, 1),
+            }
+        
+        except Exception as e:
+            logger.exception("Compression failed")
+            self._stats["errors"] += 1
+            return {
+                "success": False,
+                "error": str(e),
+                "answer": None,
+            }
+    
+    def unload(self) -> None:
+        """Unload model and free resources."""
+        if self._backend is not None:
+            self._backend.unload()
+    
+    def is_loaded(self) -> bool:
+        """Check if model is loaded and ready."""
+        return self._backend is not None and self._backend.is_loaded()
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get model status for API endpoint."""
+        backend_info = self._backend.get_info() if self._backend else {}
+        
+        return {
+            "model": self.settings.model,
+            "subfolder": self.settings.subfolder,
+            "initialized": self.is_loaded(),
+            **backend_info,
+            "requests_served": self._stats["requests"],
+            "errors": self._stats["errors"],
+            "avg_latency_ms": (
+                self._stats["total_latency"] / max(1, self._stats["requests"])
+            ),
+        }
+
+
+# Global model instance
+_model: Optional[ClaraModel] = None
+
+
+def get_model() -> ClaraModel:
+    """Get or create global model instance."""
+    global _model
+    if _model is None:
+        _model = ClaraModel()
+    return _model
+
+
+def load_model() -> ClaraModel:
+    """Load the global model instance."""
+    model = get_model()
+    if not model.is_loaded():
+        model.load()
+    return model
