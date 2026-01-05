@@ -8,18 +8,114 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 
-## Why CLaRa-Remembers-It-All?
+---
 
-Apple's [CLaRA](https://github.com/apple/ml-clara) achieves **16x-128x semantic compression** for RAG systems, dramatically reducing context length while preserving meaning. However, there's no production-ready inference server.
+## What Is This?
 
-**CLaRa-Remembers-It-All fills that gap:**
+**CLaRa-Remembers-It-All** is a standalone HTTP server that provides **semantic context compression** for RAG (Retrieval-Augmented Generation) systems.
 
-- 🔥 **FastAPI-based REST API** - Simple `/compress` endpoint
+You send it a list of memories/documents and a query → it compresses them into a dense representation and returns an answer, using **16x to 128x fewer tokens** than the original text while preserving meaning.
+
+```
+┌─────────────────┐         ┌─────────────────────┐         ┌──────────────┐
+│  Your RAG App   │  HTTP   │  CLaRa-Remembers-   │         │   Answer +   │
+│  (any language) │ ──────► │     It-All Server   │ ──────► │  Compression │
+│                 │  POST   │                     │         │    Stats     │
+└─────────────────┘         └─────────────────────┘         └──────────────┘
+     memories[]                   CLaRA Model                  "User enjoys
+     + query                      (7B params)                   hiking..."
+```
+
+**Key point:** This is a *universal tool* - it works with any RAG system, any programming language, any framework. Just make HTTP calls.
+
+---
+
+## Why Does This Exist?
+
+### The Problem
+
+RAG systems retrieve documents to provide context to LLMs, but:
+
+1. **Context windows fill up fast** - 10 retrieved documents × 500 tokens = 5,000 tokens consumed
+2. **More context ≠ better answers** - LLMs struggle with long, noisy contexts
+3. **Cost scales with tokens** - API costs grow linearly with context size
+4. **Latency increases** - More tokens = slower inference
+
+### The Solution: CLaRA
+
+Apple's [CLaRA](https://github.com/apple/ml-clara) (Continuous Latent Reasoning) compresses documents into **dense semantic representations** that preserve meaning while dramatically reducing token count:
+
+| Compression Level | Token Reduction | Use Case |
+|-------------------|-----------------|----------|
+| `compression-16` | **16x smaller** | Best quality, recommended |
+| `compression-128` | **128x smaller** | Maximum compression |
+
+**Example:** 20 memories totaling 2,000 tokens → compressed to ~125 tokens (16x) → LLM answers from compressed context.
+
+### Why This Server?
+
+Apple released the CLaRA model weights but **no production server**. This project provides:
+
+- **REST API** - Any app can use it via HTTP
+- **Network offloading** - Run on a powerful machine, access from anywhere
+- **Multi-backend** - CUDA, Apple Silicon, CPU support
+- **Production-ready** - Health checks, Docker, configuration
+
+---
+
+## How It Works
+
+### 1. Architecture
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                    CLaRa-Remembers-It-All                      │
+├────────────────────────────────────────────────────────────────┤
+│  FastAPI Server (REST API)                                     │
+│    ├── POST /compress  → Compress memories, generate answer    │
+│    ├── GET  /status    → Model info, stats                     │
+│    └── GET  /health    → Health check for load balancers       │
+├────────────────────────────────────────────────────────────────┤
+│  Model Layer                                                   │
+│    ├── PyTorch Backend (CUDA/MPS)                              │
+│    ├── MLX Backend (Apple Silicon native) [planned]            │
+│    └── CPU Fallback                                            │
+├────────────────────────────────────────────────────────────────┤
+│  CLaRA Model (apple/CLaRa-7B-Instruct)                         │
+│    └── 7B parameter model with compression layers              │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### 2. The Compression Process
+
+When you call `/compress`:
+
+1. **Input:** List of memory strings + query
+2. **Encode:** Each memory is encoded into dense vectors
+3. **Compress:** CLaRA's compression layers reduce 16-128 tokens → 1 token
+4. **Generate:** Model generates answer from compressed representation
+5. **Output:** Answer + compression statistics
+
+### 3. Use Cases
+
+- **Personal AI assistants** - Compress user history/preferences
+- **Document Q&A** - Compress retrieved passages before answering
+- **Chatbots with memory** - Store more context in less space
+- **Cost optimization** - Reduce API token costs by 16x
+- **Edge deployment** - Fit more context on smaller models
+
+---
+
+## Features
+
+- 🔥 **FastAPI REST API** - Simple `/compress` endpoint
 - 🐳 **Docker ready** - One command deployment
-- 🍎 **Apple Silicon native** - MLX backend for Mac Studio/Pro
+- 🍎 **Apple Silicon** - MPS backend, MLX coming soon
 - 🖥️ **NVIDIA CUDA** - Full GPU acceleration
-- 📊 **Production features** - Health checks, metrics, batching
-- 🌐 **Universal** - Use with any RAG system, not framework-specific
+- 📊 **Production features** - Health checks, metrics, configurable
+- 🌐 **Universal** - Use with any RAG system, any language
+- 🔒 **Optional auth** - API key authentication
+- ⚙️ **Configurable** - Environment variables for all settings
 
 ## Quick Start
 
