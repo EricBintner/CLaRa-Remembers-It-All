@@ -62,6 +62,7 @@ class PyTorchBackend(BaseModelBackend):
         self._actual_device = None
         self._dtype = None
         self._load_time = None
+        self._torch_device = None  # torch.device object for patching
     
     def load(self, model_path: str, settings: Settings) -> None:
         """Load CLaRa model using PyTorch/Transformers."""
@@ -112,6 +113,13 @@ class PyTorchBackend(BaseModelBackend):
         if not self._actual_device.startswith("cuda"):
             self._model = self._model.to(self._actual_device)
         
+        # Store torch device for patching hardcoded .to('cuda') calls in CLaRa model
+        self._torch_device = torch.device(self._actual_device)
+        
+        # Patch the model's compress method to use correct device
+        # Apple's CLaRa model has hardcoded .to('cuda') calls that break on MPS/CPU
+        self._patch_clara_device()
+        
         self._load_time = time.time() - start
         logger.info(f"Model loaded in {self._load_time:.1f}s")
     
@@ -135,6 +143,46 @@ class PyTorchBackend(BaseModelBackend):
             )
         
         return output[0] if output else ""
+    
+    def _patch_clara_device(self) -> None:
+        """
+        Patch CLaRa model's hardcoded CUDA device calls.
+        
+        Apple's CLaRa model code on HuggingFace has hardcoded .to('cuda') calls
+        in the compress method. This patches torch.Tensor.to() to intercept
+        and redirect those calls to the correct device (MPS/CPU).
+        """
+        import torch
+        
+        if self._model is None or self._torch_device is None:
+            return
+        
+        target_device = self._torch_device
+        
+        # Skip patching if we're actually on CUDA
+        if str(target_device).startswith('cuda'):
+            return
+        
+        # Monkey-patch torch.Tensor.to to intercept 'cuda' -> actual device
+        # This fixes any hardcoded .to('cuda') in the CLaRa model code
+        original_to = torch.Tensor.to
+        
+        def patched_to(tensor_self, *args, **kwargs):
+            # Intercept .to('cuda') calls and redirect to target device
+            if args:
+                first_arg = args[0]
+                if isinstance(first_arg, str) and first_arg == 'cuda':
+                    args = (target_device,) + args[1:]
+                elif isinstance(first_arg, torch.device) and first_arg.type == 'cuda':
+                    args = (target_device,) + args[1:]
+            if 'device' in kwargs:
+                dev = kwargs['device']
+                if dev == 'cuda' or (isinstance(dev, torch.device) and dev.type == 'cuda'):
+                    kwargs['device'] = target_device
+            return original_to(tensor_self, *args, **kwargs)
+        
+        torch.Tensor.to = patched_to
+        logger.info(f"Installed tensor.to() patch: 'cuda' -> {target_device}")
     
     def is_loaded(self) -> bool:
         return self._model is not None
