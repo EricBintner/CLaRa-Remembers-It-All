@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "clara-remembers-it-all"
 version = "0.1.0"
-description = "Production-ready inference server for Apple's CLaRA context compression model - Because CLaRa remembers it all"
+description = "Production-ready inference server for Apple's CLaRa context compression model - Because CLaRa remembers it all"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"

@@ -110,7 +110,7 @@ curl -X POST http://localhost:5000/api/clara/config \
   -H "Content-Type: application/json" \
   -d '{"use_remote": true, "remote_url": "http://SERVER_IP:8765"}'
 
-# Enable CLaRA
+# Enable CLaRa
 curl -X POST http://localhost:5000/api/clara/toggle \
   -d '{"enabled": true}'
 ```

@@ -23,7 +23,7 @@ class Backend(str, Enum):
 
 
 class CompressionLevel(str, Enum):
-    """CLaRA compression levels."""
+    """CLaRa compression levels."""
     COMPRESSION_16 = "compression-16"
     COMPRESSION_128 = "compression-128"
 

@@ -1,6 +1,6 @@
 # CLaRa-Remembers-It-All
 
-🧠 **Production-ready inference server for Apple's CLaRA context compression model.**
+🧠 **Production-ready inference server for Apple's CLaRa context compression model.**
 
 > *"Because CLaRa remembers it all... in 16x less space."*
 
@@ -51,7 +51,7 @@ You send it a list of memories/documents and a query → it compresses them into
 │  (any language) │ ──────► │     It-All Server   │ ──────► │  Compression │
 │                 │  POST   │                     │         │    Stats     │
 └─────────────────┘         └─────────────────────┘         └──────────────┘
-     memories[]                   CLaRA Model                  "User enjoys
+     memories[]                   CLaRa Model                  "User enjoys
      + query                      (7B params)                   hiking..."
 ```
 
@@ -59,9 +59,9 @@ You send it a list of memories/documents and a query → it compresses them into
 
 ---
 
-## About CLaRA
+## About CLaRa
 
-[CLaRA](https://github.com/apple/ml-clara) (Continuous Latent Reasoning Architecture) is a 7B parameter model from Apple ML Research that performs **semantic context compression**. It takes a collection of documents and a question, compresses the documents into a dense representation, and generates an answer—all while using significantly fewer tokens than traditional approaches.
+[CLaRa](https://github.com/apple/ml-clara) (Continuous Latent Reasoning Architecture) is a 7B parameter model from Apple ML Research that performs **semantic context compression**. It takes a collection of documents and a question, compresses the documents into a dense representation, and generates an answer—all while using significantly fewer tokens than traditional approaches.
 
 | Compression Level | Token Reduction | Use Case |
 |-------------------|-----------------|----------|
@@ -76,7 +76,7 @@ This is especially useful for RAG systems, long-context applications, and anywhe
 
 ## Why This Server?
 
-Apple released CLaRA as model weights on HuggingFace, but using it requires:
+Apple released CLaRa as model weights on HuggingFace, but using it requires:
 - Loading a 7B model into memory
 - Writing PyTorch inference code
 - Managing GPU/CPU resources
@@ -112,7 +112,7 @@ Apple released CLaRA as model weights on HuggingFace, but using it requires:
 │    ├── MLX Backend (Apple Silicon native) [planned]            │
 │    └── CPU Fallback                                            │
 ├────────────────────────────────────────────────────────────────┤
-│  CLaRA Model (apple/CLaRa-7B-Instruct)                         │
+│  CLaRa Model (apple/CLaRa-7B-Instruct)                         │
 │    └── 7B parameter model with compression layers              │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -123,7 +123,7 @@ When you call `/compress`:
 
 1. **Input:** List of memory strings + query
 2. **Encode:** Each memory is encoded into dense vectors
-3. **Compress:** CLaRA's compression layers reduce 16-128 tokens → 1 token
+3. **Compress:** CLaRa's compression layers reduce 16-128 tokens → 1 token
 4. **Generate:** Model generates answer from compressed representation
 5. **Output:** Answer + compression statistics
 
@@ -233,7 +233,7 @@ curl http://localhost:8765/health
 | **MLX** | Linux | ❌ CPU only | ⚠️ Slow |
 | **CPU** | Any | ❌ No | ⚠️ Slow |
 
-> **Note on MLX + Linux:** MLX technically runs on Linux but only with CPU backend (no GPU). This is an MLX limitation, not CLaRA - MLX's GPU acceleration requires Apple's Metal API. For Linux, use CUDA with an NVIDIA GPU instead.
+> **Note on MLX + Linux:** MLX technically runs on Linux but only with CPU backend (no GPU). This is an MLX limitation, not CLaRa - MLX's GPU acceleration requires Apple's Metal API. For Linux, use CUDA with an NVIDIA GPU instead.
 
 ### Memory Configurations
 
@@ -246,7 +246,7 @@ curl http://localhost:8765/health
 | **GPTQ** | ~4GB GPU | Fast | 🔜 Planned |
 | **AWQ** | ~4GB GPU | Fast | 🔜 Planned |
 
-*\*bitsandbytes quantization has device mismatch issues with CLaRA's custom architecture. See [QUANTIZATION.md](docs/QUANTIZATION.md) for details and workarounds.*
+*\*bitsandbytes quantization has device mismatch issues with CLaRa's custom architecture. See [QUANTIZATION.md](docs/QUANTIZATION.md) for details and workarounds.*
 
 ## Integration Examples
 
@@ -380,7 +380,7 @@ clara-server --reload
 
 ### Quantization Limitations
 
-4-bit and 8-bit quantization via bitsandbytes currently causes device mismatch errors with CLaRA's custom model architecture. This is due to how bitsandbytes handles CPU↔GPU tensor placement combined with CLaRA's `index_select` operations.
+4-bit and 8-bit quantization via bitsandbytes currently causes device mismatch errors with CLaRa's custom model architecture. This is due to how bitsandbytes handles CPU↔GPU tensor placement combined with CLaRa's `index_select` operations.
 
 **Workarounds:**
 - Use fp16 with sufficient VRAM (14GB+)
@@ -400,13 +400,13 @@ Apache 2.0 - Same as [Apple's ml-clara](https://github.com/apple/ml-clara).
 
 ## Acknowledgments
 
-- [Apple ML Research](https://github.com/apple/ml-clara) for the CLaRA model
+- [Apple ML Research](https://github.com/apple/ml-clara) for the CLaRa model
 - [HuggingFace](https://huggingface.co/apple) for model hosting
 - The open-source RAG community
 
 ## Citation
 
-If you use clara-server in your research, please cite the original CLaRA paper:
+If you use clara-server in your research, please cite the original CLaRa paper:
 
 ```bibtex
 @article{clara2024,

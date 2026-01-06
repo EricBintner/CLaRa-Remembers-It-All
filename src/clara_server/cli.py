@@ -31,7 +31,7 @@ def setup_logging(level: str = "INFO"):
 def main():
     """Main entry point for clara-server CLI."""
     parser = argparse.ArgumentParser(
-        description="Production-ready inference server for Apple's CLaRA context compression model",
+        description="Production-ready inference server for Apple's CLaRa context compression model",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

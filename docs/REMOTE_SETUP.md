@@ -11,9 +11,9 @@ Complete guide for running CLaRa-Remembers-It-All on a remote machine and connec
 │                                                                         │
 │   ┌──────────────────┐                    ┌──────────────────┐          │
 │   │  Linux Machine   │    Tailscale/LAN   │   Mac Studio     │          │
-│   │  (HumanAI)       │ ◄─────────────────►│  (CLaRA Server)  │          │
+│   │  (HumanAI)       │ ◄─────────────────►│  (CLaRa Server)  │          │
 │   │                  │                    │                  │          │
-│   │  - RAG Database  │    HTTP :8765      │  - CLaRA Model   │          │
+│   │  - RAG Database  │    HTTP :8765      │  - CLaRa Model   │          │
 │   │  - Frontend UI   │                    │  - 64GB+ Memory  │          │
 │   │  - Ollama LLMs   │                    │  - MPS Backend   │          │
 │   └──────────────────┘                    └──────────────────┘          │
@@ -40,14 +40,14 @@ pip install -e .
 
 ### 1.2 First Run (Downloads Model)
 
-The first run downloads the CLaRA model (~14GB). This takes 5-10 minutes:
+The first run downloads the CLaRa model (~14GB). This takes 5-10 minutes:
 
 ```bash
 # Start server (will download model on first run)
 clara-server --port 8765
 
 # You'll see:
-# INFO: Loading CLaRA model from HuggingFace...
+# INFO: Loading CLaRa model from HuggingFace...
 # INFO: Downloading apple/CLaRa-7B-Instruct...
 # INFO: Model loaded in 42.3s
 # INFO: Server running on http://0.0.0.0:8765
@@ -145,7 +145,7 @@ curl -X POST http://100.x.x.x:8765/compress \
 
 ### 3.1 HumanAI Integration
 
-Configure HumanAI to use the remote CLaRA server:
+Configure HumanAI to use the remote CLaRa server:
 
 ```bash
 # Via API
@@ -156,7 +156,7 @@ curl -X POST http://localhost:5000/api/clara/config \
     "remote_url": "http://100.x.x.x:8765"
   }'
 
-# Enable CLaRA
+# Enable CLaRa
 curl -X POST http://localhost:5000/api/clara/toggle \
   -H "Content-Type: application/json" \
   -d '{"enabled": true}'
@@ -167,7 +167,7 @@ curl http://localhost:5000/api/clara/remote/health
 
 Or via the Settings UI in HumanAI:
 1. Go to Settings → Knowledge
-2. Enable "CLaRA Context Compression"
+2. Enable "CLaRa Context Compression"
 3. Enable "Use Remote Server"
 4. Enter: `http://100.x.x.x:8765`
 5. Click "Test Connection"
@@ -212,8 +212,8 @@ fetch("http://100.x.x.x:8765/compress", {method: "POST", ...})
 
 ### 4.1 HumanAI Memory Database
 
-HumanAI automatically uses CLaRA when:
-- CLaRA is enabled
+HumanAI automatically uses CLaRa when:
+- CLaRa is enabled
 - Remote mode is configured
 - Query retrieves more than `auto_compress_threshold` memories
 
@@ -223,7 +223,7 @@ Test manually:
 # Get memories from HumanAI
 curl http://localhost:5000/api/memory/search?query=hobbies&limit=10
 
-# These are automatically compressed via CLaRA when used in conversation
+# These are automatically compressed via CLaRa when used in conversation
 ```
 
 ### 4.2 IT App / Other Databases
@@ -236,7 +236,7 @@ import requests
 # Your app retrieves documents from its database
 documents = your_database.search("user query", limit=20)
 
-# Send to CLaRA for compression
+# Send to CLaRa for compression
 response = requests.post(
     "http://100.x.x.x:8765/compress",
     json={
@@ -306,7 +306,7 @@ tailscale status
 # Check memory usage
 top -l 1 | grep clara
 
-# CLaRA needs ~14GB unified memory
+# CLaRa needs ~14GB unified memory
 # Close other apps if needed
 ```
 

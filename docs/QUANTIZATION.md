@@ -1,11 +1,11 @@
-# CLaRA Quantization Support
+# CLaRa Quantization Support
 
 **Status:** ⚠️ Limited  
 **Last Updated:** 2026-01-05
 
 ## Overview
 
-CLaRA's custom model architecture has compatibility issues with certain quantization methods. This document explains the current state and workarounds.
+CLaRa's custom model architecture has compatibility issues with certain quantization methods. This document explains the current state and workarounds.
 
 ## Current Support
 
@@ -30,12 +30,12 @@ different from other tensors on cpu (when checking argument in method wrapper_CU
 ### Root Cause
 
 1. **bitsandbytes** stores quantized weights on CPU and moves them to GPU during computation
-2. **CLaRA's custom code** uses `index_select` operations that expect all tensors on the same device
+2. **CLaRa's custom code** uses `index_select` operations that expect all tensors on the same device
 3. The model's `generate_from_text()` method references `self.decoder.device` but this doesn't account for the CPU-GPU split
 
 ### Affected Code
 
-In CLaRA's `modeling_clara.py`:
+In CLaRa's `modeling_clara.py`:
 ```python
 def generate_from_text(self, questions, documents, max_new_tokens=128):
     device = self.decoder.device  # Returns cuda:0
@@ -88,7 +88,7 @@ CLARA_BACKEND=cpu clara-server
 These quantization methods keep all weights on GPU, avoiding the device mismatch issue. However, they require:
 
 1. Pre-quantized model weights
-2. Someone to create and publish quantized CLaRA weights
+2. Someone to create and publish quantized CLaRa weights
 
 We plan to add support when quantized weights become available.
 
@@ -150,6 +150,6 @@ If you find a solution to the quantization issue, please:
 3. Document any requirements or limitations
 
 We especially welcome:
-- Patches to CLaRA's modeling code for device handling
+- Patches to CLaRa's modeling code for device handling
 - Pre-quantized GPTQ/AWQ weights
 - Alternative quantization approaches

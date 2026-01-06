@@ -1,5 +1,5 @@
 """
-FastAPI server for CLaRA inference.
+FastAPI server for CLaRa inference.
 
 Provides REST API endpoints for context compression.
 """
@@ -113,7 +113,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     
     app = FastAPI(
         title="clara-server",
-        description="Production-ready inference server for Apple's CLaRA context compression model",
+        description="Production-ready inference server for Apple's CLaRa context compression model",
         version="0.1.0",
         lifespan=lifespan,
         docs_url="/docs",
@@ -183,7 +183,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         Compress memories and generate answer.
         
         Takes a list of memory strings and a query, compresses the memories
-        using CLaRA's 16x semantic compression, and generates an answer.
+        using CLaRa's 16x semantic compression, and generates an answer.
         
         **Example:**
         ```json

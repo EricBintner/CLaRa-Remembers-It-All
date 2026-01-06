@@ -1,5 +1,5 @@
 """
-CLaRA model loading and inference.
+CLaRa model loading and inference.
 
 Supports multiple backends:
 - CUDA: NVIDIA GPUs via PyTorch
@@ -64,7 +64,7 @@ class PyTorchBackend(BaseModelBackend):
         self._load_time = None
     
     def load(self, model_path: str, settings: Settings) -> None:
-        """Load CLaRA model using PyTorch/Transformers."""
+        """Load CLaRa model using PyTorch/Transformers."""
         import torch
         from huggingface_hub import snapshot_download
         from transformers import AutoModel
@@ -97,7 +97,7 @@ class PyTorchBackend(BaseModelBackend):
             local_dir=str(cache_dir),
         )
         
-        # Load from subfolder (CLaRA requires this structure)
+        # Load from subfolder (CLaRa requires this structure)
         full_model_path = f"{local_dir}/{settings.subfolder}"
         logger.info(f"Loading model from {full_model_path}")
         
@@ -121,7 +121,7 @@ class PyTorchBackend(BaseModelBackend):
         query: str,
         max_new_tokens: int = 128,
     ) -> str:
-        """Generate answer using CLaRA's generate_from_text method."""
+        """Generate answer using CLaRa's generate_from_text method."""
         import torch
         
         if self._model is None:
@@ -177,14 +177,14 @@ class MLXBackend(BaseModelBackend):
         self._load_time = None
     
     def load(self, model_path: str, settings: Settings) -> None:
-        """Load CLaRA model using MLX."""
-        # TODO: Implement MLX loading when CLaRA MLX weights are available
+        """Load CLaRa model using MLX."""
+        # TODO: Implement MLX loading when CLaRa MLX weights are available
         # This will require either:
         # 1. Converting PyTorch weights to MLX format
         # 2. Apple releasing MLX-native weights
         raise NotImplementedError(
             "MLX backend is not yet implemented. "
-            "CLaRA requires custom model code that needs MLX porting. "
+            "CLaRa requires custom model code that needs MLX porting. "
             "Use 'mps' backend for Apple Silicon via PyTorch."
         )
     
@@ -214,7 +214,7 @@ class MLXBackend(BaseModelBackend):
 
 class ClaraModel:
     """
-    High-level CLaRA model wrapper.
+    High-level CLaRa model wrapper.
     
     Automatically selects the best backend and provides a unified interface.
     """
@@ -272,7 +272,7 @@ class ClaraModel:
             
             # Estimate token counts (rough approximation)
             original_tokens = sum(len(m.split()) * 1.3 for m in memories)
-            compressed_tokens = original_tokens / 16  # CLaRA achieves ~16x compression
+            compressed_tokens = original_tokens / 16  # CLaRa achieves ~16x compression
             
             latency = (time.time() - start) * 1000
             self._stats["requests"] += 1

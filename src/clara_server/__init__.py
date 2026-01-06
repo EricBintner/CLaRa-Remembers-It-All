@@ -1,9 +1,9 @@
 """
-CLaRa-Remembers-It-All: Production-ready inference server for Apple's CLaRA context compression model.
+CLaRa-Remembers-It-All: Production-ready inference server for Apple's CLaRa context compression model.
 
 "Because CLaRa remembers it all... in 16x less space."
 
-This package provides a FastAPI-based REST API for CLaRA inference,
+This package provides a FastAPI-based REST API for CLaRa inference,
 supporting multiple backends (CUDA, MPS, MLX, CPU) for universal deployment.
 """
 

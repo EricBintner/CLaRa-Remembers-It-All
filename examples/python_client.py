@@ -80,7 +80,7 @@ class ClaraClient:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="CLaRA client example")
+    parser = argparse.ArgumentParser(description="CLaRa client example")
     parser.add_argument("--url", default="http://localhost:8765", help="Server URL")
     parser.add_argument("--api-key", help="API key for authentication")
     args = parser.parse_args()
