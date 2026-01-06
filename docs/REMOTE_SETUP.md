@@ -6,9 +6,9 @@ Complete guide for running CLaRa-Remembers-It-All on a remote machine and connec
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           NETWORK SETUP                                  │
+│                           NETWORK SETUP                                 │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
+│                                                                         │
 │   ┌──────────────────┐                    ┌──────────────────┐          │
 │   │  Linux Machine   │    Tailscale/LAN   │   Mac Studio     │          │
 │   │  (HumanAI)       │ ◄─────────────────►│  (CLaRA Server)  │          │
@@ -17,7 +17,7 @@ Complete guide for running CLaRa-Remembers-It-All on a remote machine and connec
 │   │  - Frontend UI   │                    │  - 64GB+ Memory  │          │
 │   │  - Ollama LLMs   │                    │  - MPS Backend   │          │
 │   └──────────────────┘                    └──────────────────┘          │
-│                                                                          │
+│                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -98,10 +98,10 @@ If both machines are on Tailscale:
 ```bash
 # Get Mac's Tailscale IP
 tailscale ip -4
-# Example: 100.74.58.17
+# Example: 100.x.x.x
 
 # Server URL for clients:
-# http://100.74.58.17:8765
+# http://100.x.x.x:8765
 ```
 
 ### Option B: Local Network
@@ -128,10 +128,10 @@ From the client machine:
 
 ```bash
 # Test connection
-curl http://100.74.58.17:8765/health
+curl http://100.x.x.x:8765/health
 
 # Test compression
-curl -X POST http://100.74.58.17:8765/compress \
+curl -X POST http://100.x.x.x:8765/compress \
   -H "Content-Type: application/json" \
   -d '{
     "memories": ["Test memory 1", "Test memory 2"],
@@ -153,7 +153,7 @@ curl -X POST http://localhost:5000/api/clara/config \
   -H "Content-Type: application/json" \
   -d '{
     "use_remote": true,
-    "remote_url": "http://100.74.58.17:8765"
+    "remote_url": "http://100.x.x.x:8765"
   }'
 
 # Enable CLaRA
@@ -169,7 +169,7 @@ Or via the Settings UI in HumanAI:
 1. Go to Settings → Knowledge
 2. Enable "CLaRA Context Compression"
 3. Enable "Use Remote Server"
-4. Enter: `http://100.74.58.17:8765`
+4. Enter: `http://100.x.x.x:8765`
 5. Click "Test Connection"
 
 ### 3.2 Python Client
@@ -177,7 +177,7 @@ Or via the Settings UI in HumanAI:
 ```python
 from clara_client import ClaraClient
 
-client = ClaraClient("http://100.74.58.17:8765")
+client = ClaraClient("http://100.x.x.x:8765")
 
 # Check health
 print(client.health())
@@ -194,16 +194,16 @@ print(result["answer"])
 
 ```bash
 # cURL
-curl -X POST http://100.74.58.17:8765/compress \
+curl -X POST http://100.x.x.x:8765/compress \
   -H "Content-Type: application/json" \
   -d '{"memories": [...], "query": "..."}'
 
 # Python requests
 import requests
-requests.post("http://100.74.58.17:8765/compress", json={...})
+requests.post("http://100.x.x.x:8765/compress", json={...})
 
 # JavaScript fetch
-fetch("http://100.74.58.17:8765/compress", {method: "POST", ...})
+fetch("http://100.x.x.x:8765/compress", {method: "POST", ...})
 ```
 
 ---
@@ -238,7 +238,7 @@ documents = your_database.search("user query", limit=20)
 
 # Send to CLaRA for compression
 response = requests.post(
-    "http://100.74.58.17:8765/compress",
+    "http://100.x.x.x:8765/compress",
     json={
         "memories": [doc.text for doc in documents],
         "query": "user query"
@@ -254,7 +254,7 @@ compressed_answer = response.json()["answer"]
 ```bash
 # Run benchmark script
 cd CLaRa-Remembers-It-All
-python examples/benchmark.py --url http://100.74.58.17:8765 --memories 20
+python examples/benchmark.py --url http://100.x.x.x:8765 --memories 20
 
 # Output:
 # Memories: 20
