@@ -10,6 +10,35 @@
 
 ---
 
+## ⚡ Quick Start (Copy-Paste)
+
+```bash
+# One-liner setup
+git clone https://github.com/EricBintner/CLaRa-Remembers-It-All.git && cd CLaRa-Remembers-It-All && python3 -m venv .venv && source .venv/bin/activate && pip install -e . && clara-server
+```
+
+Or step by step:
+```bash
+git clone https://github.com/EricBintner/CLaRa-Remembers-It-All.git
+cd CLaRa-Remembers-It-All
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e .
+clara-server
+```
+
+**First run downloads ~14GB model (5-10 min).** Server runs at `http://localhost:8765`
+
+**Test it:**
+```bash
+curl http://localhost:8765/health
+curl -X POST http://localhost:8765/compress -H "Content-Type: application/json" \
+  -d '{"memories": ["User likes hiking", "User has a dog"], "query": "What are the user hobbies?"}'
+```
+
+> 📖 **AI assistants:** See [AI-SETUP.md](AI-SETUP.md) for platform-specific commands and troubleshooting.
+
+---
+
 ## What Is This?
 
 **CLaRa-Remembers-It-All** is a standalone HTTP server that provides **semantic context compression** for RAG (Retrieval-Augmented Generation) systems.
@@ -30,36 +59,38 @@ You send it a list of memories/documents and a query → it compresses them into
 
 ---
 
-## Why Does This Exist?
+## About CLaRA
 
-### The Problem
-
-RAG systems retrieve documents to provide context to LLMs, but:
-
-1. **Context windows fill up fast** - 10 retrieved documents × 500 tokens = 5,000 tokens consumed
-2. **More context ≠ better answers** - LLMs struggle with long, noisy contexts
-3. **Cost scales with tokens** - API costs grow linearly with context size
-4. **Latency increases** - More tokens = slower inference
-
-### The Solution: CLaRA
-
-Apple's [CLaRA](https://github.com/apple/ml-clara) (Continuous Latent Reasoning) compresses documents into **dense semantic representations** that preserve meaning while dramatically reducing token count:
+[CLaRA](https://github.com/apple/ml-clara) (Continuous Latent Reasoning Architecture) is a 7B parameter model from Apple ML Research that performs **semantic context compression**. It takes a collection of documents and a question, compresses the documents into a dense representation, and generates an answer—all while using significantly fewer tokens than traditional approaches.
 
 | Compression Level | Token Reduction | Use Case |
 |-------------------|-----------------|----------|
 | `compression-16` | **16x smaller** | Best quality, recommended |
 | `compression-128` | **128x smaller** | Maximum compression |
 
-**Example:** 20 memories totaling 2,000 tokens → compressed to ~125 tokens (16x) → LLM answers from compressed context.
+**Example:** 20 documents totaling 2,000 tokens → compressed to ~125 tokens → model answers from the compressed context.
 
-### Why This Server?
+This is especially useful for RAG systems, long-context applications, and anywhere you want to fit more information into a fixed context window.
 
-Apple released the CLaRA model weights but **no production server**. This project provides:
+---
 
-- **REST API** - Any app can use it via HTTP
-- **Network offloading** - Run on a powerful machine, access from anywhere
-- **Multi-backend** - CUDA, Apple Silicon, CPU support
-- **Production-ready** - Health checks, Docker, configuration
+## Why This Server?
+
+Apple released CLaRA as model weights on HuggingFace, but using it requires:
+- Loading a 7B model into memory
+- Writing PyTorch inference code
+- Managing GPU/CPU resources
+
+**CLaRa-Remembers-It-All** wraps all of this into a simple HTTP server:
+
+| You get... | Instead of... |
+|------------|---------------|
+| `POST /compress` | Writing model loading code |
+| Run on any machine, call from anywhere | Running locally only |
+| CUDA, MPS, CPU auto-detection | Manual backend setup |
+| Health checks, Docker, config | Building infrastructure |
+
+**One machine runs the model, any application can use it over HTTP.**
 
 ---
 
