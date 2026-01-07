@@ -111,3 +111,6 @@ logs/
 # Local configuration
 .env.local
 .env.*.local
+
+# Research folder (local experiments, not tracked)
+research/
