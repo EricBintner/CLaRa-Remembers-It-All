@@ -9,8 +9,10 @@ Supports multiple backends:
 """
 
 import logging
+import threading
 import time
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -265,6 +267,7 @@ class ClaraModel:
     High-level CLaRa model wrapper.
     
     Automatically selects the best backend and provides a unified interface.
+    Implements Ollama-style auto-unload to free RAM when idle.
     """
     
     def __init__(self, settings: Optional[Settings] = None):
@@ -275,18 +278,29 @@ class ClaraModel:
             "total_latency": 0.0,
             "errors": 0,
         }
+        
+        # Auto-unload state (Ollama-style)
+        self._last_activity: Optional[float] = None
+        self._unload_timer: Optional[threading.Timer] = None
+        self._lock = threading.Lock()
     
     def load(self) -> None:
         """Load the model using the configured backend."""
-        backend_name = self.settings.detect_backend()
-        logger.info(f"Initializing {backend_name} backend")
-        
-        if backend_name == Backend.MLX.value:
-            self._backend = MLXBackend()
-        else:
-            self._backend = PyTorchBackend(device=backend_name)
-        
-        self._backend.load(self.settings.model, self.settings)
+        with self._lock:
+            if self.is_loaded():
+                logger.debug("Model already loaded")
+                return
+            
+            backend_name = self.settings.detect_backend()
+            logger.info(f"Initializing {backend_name} backend")
+            
+            if backend_name == Backend.MLX.value:
+                self._backend = MLXBackend()
+            else:
+                self._backend = PyTorchBackend(device=backend_name)
+            
+            self._backend.load(self.settings.model, self.settings)
+            self._update_activity()
     
     def compress(
         self,
@@ -297,6 +311,9 @@ class ClaraModel:
         """
         Compress memories and generate answer.
         
+        Automatically loads model if not loaded (lazy loading).
+        Resets keep_alive timer after each request.
+        
         Args:
             memories: List of memory strings to compress
             query: Question to answer from compressed context
@@ -305,6 +322,19 @@ class ClaraModel:
         Returns:
             Dict with success, answer, token counts, compression ratio, latency
         """
+        # Lazy load if not loaded (Ollama-style)
+        if not self.is_loaded():
+            logger.info("Model not loaded, loading on demand...")
+            try:
+                self.load()
+            except Exception as e:
+                logger.error(f"Failed to load model: {e}")
+                return {
+                    "success": False,
+                    "error": f"Failed to load model: {e}",
+                    "answer": None,
+                }
+        
         if self._backend is None or not self._backend.is_loaded():
             return {
                 "success": False,
@@ -326,6 +356,9 @@ class ClaraModel:
             self._stats["requests"] += 1
             self._stats["total_latency"] += latency
             
+            # Update activity and schedule unload timer
+            self._update_activity()
+            
             return {
                 "success": True,
                 "answer": answer,
@@ -338,16 +371,71 @@ class ClaraModel:
         except Exception as e:
             logger.exception("Compression failed")
             self._stats["errors"] += 1
+            # Still update activity on error to prevent immediate unload
+            self._update_activity()
             return {
                 "success": False,
                 "error": str(e),
                 "answer": None,
             }
     
-    def unload(self) -> None:
-        """Unload model and free resources."""
+    def _update_activity(self) -> None:
+        """Update last activity time and schedule auto-unload."""
+        self._last_activity = time.time()
+        self._schedule_unload()
+    
+    def _schedule_unload(self) -> None:
+        """Schedule model unload based on keep_alive setting."""
+        # Cancel any existing timer
+        if self._unload_timer is not None:
+            self._unload_timer.cancel()
+            self._unload_timer = None
+        
+        keep_alive = self.settings.keep_alive
+        
+        # -1 means never unload
+        if keep_alive < 0:
+            return
+        
+        # 0 means immediate unload after request
+        if keep_alive == 0:
+            logger.info("keep_alive=0, unloading immediately")
+            self.unload()
+            return
+        
+        # Schedule unload after keep_alive seconds
+        self._unload_timer = threading.Timer(keep_alive, self._auto_unload)
+        self._unload_timer.daemon = True
+        self._unload_timer.start()
+        logger.debug(f"Scheduled auto-unload in {keep_alive}s")
+    
+    def _auto_unload(self) -> None:
+        """Auto-unload callback - only unload if still idle."""
+        with self._lock:
+            if self._last_activity is None:
+                return
+            
+            elapsed = time.time() - self._last_activity
+            keep_alive = self.settings.keep_alive
+            
+            if elapsed >= keep_alive:
+                logger.info(f"Auto-unloading model after {elapsed:.0f}s idle (keep_alive={keep_alive}s)")
+                self._do_unload()
+    
+    def _do_unload(self) -> None:
+        """Internal unload without lock (called from locked context)."""
         if self._backend is not None:
             self._backend.unload()
+            self._backend = None
+        self._last_activity = None
+        if self._unload_timer is not None:
+            self._unload_timer.cancel()
+            self._unload_timer = None
+    
+    def unload(self) -> None:
+        """Unload model and free resources."""
+        with self._lock:
+            self._do_unload()
     
     def is_loaded(self) -> bool:
         """Check if model is loaded and ready."""
@@ -355,7 +443,25 @@ class ClaraModel:
     
     def get_status(self) -> Dict[str, Any]:
         """Get model status for API endpoint."""
-        backend_info = self._backend.get_info() if self._backend else {}
+        backend_info = self._backend.get_info() if self._backend and self._backend.is_loaded() else {}
+        
+        # Calculate unload timing
+        keep_alive = self.settings.keep_alive
+        last_activity_iso = None
+        will_unload_at_iso = None
+        seconds_until_unload = None
+        
+        if self._last_activity is not None:
+            last_activity_iso = datetime.fromtimestamp(
+                self._last_activity, tz=timezone.utc
+            ).isoformat()
+            
+            if keep_alive > 0:
+                unload_at = self._last_activity + keep_alive
+                will_unload_at_iso = datetime.fromtimestamp(
+                    unload_at, tz=timezone.utc
+                ).isoformat()
+                seconds_until_unload = max(0, int(unload_at - time.time()))
         
         return {
             "model": self.settings.model,
@@ -367,6 +473,11 @@ class ClaraModel:
             "avg_latency_ms": (
                 self._stats["total_latency"] / max(1, self._stats["requests"])
             ),
+            # Auto-unload info (Ollama-style)
+            "keep_alive_seconds": keep_alive,
+            "last_activity": last_activity_iso,
+            "will_unload_at": will_unload_at_iso,
+            "seconds_until_unload": seconds_until_unload,
         }
 
 

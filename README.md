@@ -219,6 +219,7 @@ curl http://localhost:8765/health
 | `CLARA_PORT` | `8765` | Server port |
 | `CLARA_HOST` | `0.0.0.0` | Bind address |
 | `CLARA_BACKEND` | `auto` | Backend: `auto`, `cuda`, `mps`, `mlx`, `cpu` |
+| `CLARA_KEEP_ALIVE` | `300` | Seconds to keep model loaded (0=immediate, -1=never) |
 | `CLARA_CACHE` | `~/.cache/clara-server` | Model cache directory |
 
 ## Backends & Memory Options
@@ -247,6 +248,48 @@ curl http://localhost:8765/health
 | **AWQ** | ~4GB GPU | Fast | 🔜 Planned |
 
 *\*bitsandbytes quantization has device mismatch issues with CLaRa's custom architecture. See [QUANTIZATION.md](docs/QUANTIZATION.md) for details and workarounds.*
+
+## Auto-Unload (Ollama-Style Memory Management)
+
+CLaRa implements **Ollama-style auto-unload** to free RAM when the model is idle:
+
+```
+Request → Model Loads → Timer Starts → Idle Timeout → Model Unloads → RAM Free
+              ↑                                              ↓
+              └──────────── Next Request ←──────────────────┘
+```
+
+| Setting | Value | Behavior |
+|---------|-------|----------|
+| `--keep-alive 300` | 5 minutes (default) | Unload after 5 min idle |
+| `--keep-alive 0` | 0 seconds | Unload immediately after each request |
+| `--keep-alive -1` | Never | Keep loaded forever (old behavior) |
+
+**Examples:**
+```bash
+# Default: 5 minute keep-alive (like Ollama)
+clara-server
+
+# Aggressive memory savings: unload immediately
+clara-server --keep-alive 0
+
+# Never unload (persistent)
+clara-server --keep-alive -1
+
+# Environment variable
+CLARA_KEEP_ALIVE=60 clara-server
+```
+
+The `/status` endpoint shows auto-unload timing:
+```json
+{
+  "initialized": true,
+  "keep_alive_seconds": 300,
+  "last_activity": "2024-01-15T10:30:00Z",
+  "will_unload_at": "2024-01-15T10:35:00Z",
+  "seconds_until_unload": 180
+}
+```
 
 ## Integration Examples
 

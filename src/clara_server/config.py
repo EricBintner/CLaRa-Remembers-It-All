@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     max_new_tokens: int = Field(default=128, description="Default max tokens for generation")
     batch_size: int = Field(default=1, description="Batch size for inference")
     
+    # Auto-unload settings (Ollama-style memory management)
+    keep_alive: int = Field(
+        default=300,  # 5 minutes like Ollama default
+        description="Seconds to keep model loaded after last request. 0=immediate unload, -1=never unload"
+    )
+    
     # Security settings (optional)
     api_key: Optional[str] = Field(default=None, description="API key for authentication")
     rate_limit: Optional[int] = Field(default=None, description="Requests per minute per IP")

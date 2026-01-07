@@ -47,6 +47,7 @@ Environment Variables:
     CLARA_PORT         Server port (default: 8765)
     CLARA_HOST         Bind address (default: 0.0.0.0)
     CLARA_BACKEND      Backend: auto, cuda, mps, mlx, cpu (default: auto)
+    CLARA_KEEP_ALIVE   Seconds to keep model loaded (default: 300, -1=never)
     CLARA_API_KEY      Optional API key for authentication
     CLARA_CACHE        Model cache directory
         """,
@@ -96,6 +97,12 @@ Environment Variables:
         help="Number of worker processes (default: 1)",
     )
     parser.add_argument(
+        "--keep-alive",
+        type=int,
+        default=None,
+        help="Seconds to keep model loaded after request (default: 300). Use 0 for immediate unload, -1 for never unload.",
+    )
+    parser.add_argument(
         "--log-level",
         type=str,
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -130,6 +137,8 @@ Environment Variables:
         overrides["reload"] = args.reload
     if args.workers:
         overrides["workers"] = args.workers
+    if args.keep_alive is not None:
+        overrides["keep_alive"] = args.keep_alive
     overrides["log_level"] = args.log_level
     
     # Apply overrides
@@ -142,6 +151,8 @@ Environment Variables:
     logger.info(f"Model: {settings.model}")
     logger.info(f"Subfolder: {settings.subfolder}")
     logger.info(f"Backend: {settings.backend.value}")
+    keep_alive_str = "never" if settings.keep_alive < 0 else f"{settings.keep_alive}s"
+    logger.info(f"Keep-alive: {keep_alive_str}")
     logger.info(f"Binding to {settings.host}:{settings.port}")
     
     # Start server
