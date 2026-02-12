@@ -1,6 +1,11 @@
 # CLaRa-Remembers-It-All
 
-🧠 **Production-ready inference server for Apple's CLaRa context compression model.**
+🧠 **Like Ollama, but for Apple's CLaRa context compression model.**
+
+Run `clara-server` once (locally or on a GPU box), then call it from any app over HTTP.
+
+- **What it is**: A lightweight REST server that hosts the CLaRa model and exposes `POST /compress`.
+- **What it isn't**: A Python library you import into your app; your app stays separate and just makes HTTP requests.
 
 > *"Because CLaRa remembers it all... in 16x less space."*
 
