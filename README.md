@@ -182,7 +182,8 @@ curl -X POST http://localhost:8765/compress \
       "User works as a software engineer.",
       "User has a dog named Max."
     ],
-    "query": "What outdoor activities does the user enjoy?"
+    "query": "What outdoor activities does the user enjoy?",
+    "keep_alive": 300
   }'
 ```
 
@@ -221,6 +222,25 @@ curl http://localhost:8765/health
 | `CLARA_BACKEND` | `auto` | Backend: `auto`, `cuda`, `mps`, `mlx`, `cpu` |
 | `CLARA_KEEP_ALIVE` | `300` | Seconds to keep model loaded (0=immediate, -1=never) |
 | `CLARA_CACHE` | `~/.cache/clara-server` | Model cache directory |
+
+### Per-Request Keep-Alive
+
+You can override the default keep-alive setting for a specific request by passing the `keep_alive` parameter in the API body:
+
+```json
+{
+  "memories": ["..."],
+  "query": "...",
+  "keep_alive": 0
+}
+```
+
+| Value | Behavior |
+|-------|----------|
+| `"keep_alive": 60` | Override: keep loaded 60s after this request |
+| `"keep_alive": 0` | Unload immediately after this request |
+| `"keep_alive": -1` | Never unload after this request |
+| *(omitted)* | Use server default |
 
 ## Backends & Memory Options
 
